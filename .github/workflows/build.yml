@@ -1,0 +1,75 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'openwrt-port/docs/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'openwrt-port/docs/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune -af || true
+          df -h /
+
+      # OpenWrt's build tree is large; put it on the runner's big ephemeral
+      # volume (/mnt) and make it world-writable so the container's unprivileged
+      # `builder` user can write there.
+      - name: Prepare build dir
+        run: |
+          sudo mkdir -p /mnt/build
+          sudo chmod 777 /mnt/build
+
+      # Reuse the exact same build.sh used locally: it installs deps, clones
+      # OpenWrt, injects the device + board files, and builds. build.sh exits
+      # non-zero on a build failure.
+      - name: Build OpenWrt image
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/openwrt-port:/staging" \
+            -v /mnt/build:/build \
+            debian:bookworm \
+            bash /staging/docker/build.sh
+
+      - name: Build log tail
+        if: always()
+        run: tail -n 80 openwrt-port/build.log || true
+
+      - name: Upload images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vistotek-c6130g-images
+          path: |
+            openwrt-port/artifacts/*.bin
+            openwrt-port/artifacts/*.itb
+            openwrt-port/artifacts/*.manifest
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: openwrt-port/build.log
+          if-no-files-found: warn
+          retention-days: 14

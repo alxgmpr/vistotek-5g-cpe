@@ -70,3 +70,5 @@ ls -l bin/targets/mediatek/filogic/*vistotek* 2>/dev/null || echo "(no artifacts
 mkdir -p /staging/artifacts
 cp -v bin/targets/mediatek/filogic/*vistotek* /staging/artifacts/ 2>/dev/null || echo "no copy"
 echo "[END rc=$RC]"
+# propagate the real build result so CI (and `docker start`) can detect failure
+exit "$RC"
