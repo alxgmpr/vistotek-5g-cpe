@@ -33,7 +33,7 @@ dial (no SIM on hand).
   scheme (`cmcc_a10-stock` style): a gzip kernel FIT in the `kernel` UBI volume plus a
   separate squashfs `rootfs` volume that is auto-`ubiblock`'d as root. No fitblk, no
   U-Boot changes. (The fitblk / `ubi-volume-fit` scheme was tried first and fails on the
-  stock U-Boot — see [RESUME-FLASH-INSTALL.md](RESUME-FLASH-INSTALL.md).)
+  stock U-Boot — see [openwrt-port/RESUME-FLASH-INSTALL.md](openwrt-port/RESUME-FLASH-INSTALL.md).)
 - **Serial console** — needs both `&uart0 { status = "okay" }` and
   `aliases { serial0 = &uart0 }`; the base dtsi ships the UART disabled.
 - **WiFi** — both bands via mt76 and the Factory eeprom.
@@ -54,23 +54,25 @@ lights one LED by connection state: `blue:5g` = 5G online, `yellow:5g` = 5G atta
 `blue:4g` / `yellow:4g` = the LTE equivalents, all off = no service. It only drives LEDs
 left on the `none` kernel trigger, so a LuCI override (e.g. `default-on` = always on) or
 `/etc/init.d/modem-led disable` takes over. Design:
-[docs/2026-07-16-modem-led-design.md](docs/2026-07-16-modem-led-design.md).
+[openwrt-port/docs/2026-07-16-modem-led-design.md](openwrt-port/docs/2026-07-16-modem-led-design.md).
 
 ## Building
 
-Everything for the port lives in this folder. `docker/build.sh` clones OpenWrt, injects
-the device tree, the image recipe (`Device/vistotek_c6130g`), and the board.d / `files/`
-overlays, then builds the `mediatek/filogic` image. Build in a Linux container on a
-case-sensitive filesystem — never a mounted macOS volume. Output lands in `artifacts/`:
+Everything for the port lives in [`openwrt-port/`](openwrt-port/). `openwrt-port/docker/build.sh`
+clones OpenWrt, injects the device tree, the image recipe (`Device/vistotek_c6130g`), and the
+board.d / `files/` overlays, then builds the `mediatek/filogic` image. Build in a Linux container
+on a case-sensitive filesystem — never a mounted macOS volume. Output lands in
+`openwrt-port/artifacts/`:
 
 - `openwrt-mediatek-filogic-vistotek_c6130g-squashfs-sysupgrade.bin` — the flash image
 - `openwrt-mediatek-filogic-vistotek_c6130g-initramfs-kernel.bin` — RAM-boot recovery
 
-CI builds the image on every push — see [`.github/workflows/build.yml`](../.github/workflows/build.yml).
+CI builds the image on every push — see [`.github/workflows/build.yml`](.github/workflows/build.yml).
 
 Standalone DTS sanity check (no full build):
 
 ```sh
+cd openwrt-port
 gcc -E -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I harness \
     -o /tmp/board.pp.dts mt7981b-vistotek-c6130g.dts
 dtc -I dts -O dtb -o /tmp/board.dtb /tmp/board.pp.dts
@@ -114,4 +116,4 @@ squashfs), and `wtinfo_decrypt.py` (the wtinfo/MAC decryptor, key `wtinfo-des-v1
   wiki page.
 
 For the blow-by-blow NAND-boot debugging and the full bench / serial / TFTP setup, see
-[RESUME-FLASH-INSTALL.md](RESUME-FLASH-INSTALL.md).
+[openwrt-port/RESUME-FLASH-INSTALL.md](openwrt-port/RESUME-FLASH-INSTALL.md).
