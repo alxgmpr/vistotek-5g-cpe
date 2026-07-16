@@ -1,0 +1,343 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+/dts-v1/;
+
+#include "mt7981b.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/*
+ * Vistotek C6130G-5G  (ODM: Wingtech WT7981P)
+ *   SoC     : MediaTek MT7981B (Filogic 820), 512 MiB DDR3
+ *   WiFi    : MT7976 2.4G+5G  -> mt76
+ *   Switch  : MT7531 DSA (lan2, lan3, wan), 2.5G CPU port
+ *   Modem   : Quectel RM520N-GL 5G over USB (QMI / quectel-CM), AT on ttyUSB2
+ *   Storage : SPI-NAND (Winbond W25N01, 128 MiB) on &spi0  -> ubi/ubi2 rootfs
+ *             SPI-NOR  (Winbond W25Q32, 4 MiB)   on &spi2  -> bootloader/factory
+ *
+ * Templates: gatonetworks-gdsp (modem/USB/NOR) + cudy-wr3000-nand (SPI-NAND/UBI).
+ * Node labels (&spi0/&spi2/&mdio_bus/&mdio_pins/&wifi/&xhci/&pio) verified against
+ * the OpenWrt mediatek/filogic mt7981b.dtsi.
+ *
+ * MAC: per-unit MAC lives in the 'wtinfo' factory partition (Factory MAC bytes are
+ * zero). Only the JSON body of wtinfo is DES-encrypted — the MAC sits in the
+ * plaintext header at offset 0x0a, so a plain nvmem fixed-layout cell reads it.
+ *
+ * Modem power-on (verified on hw): module starts on a 5gpwrkey pulse (1 -> 1s -> 0),
+ * handled by /etc/init.d/modem-power. [VERIFY] remaining: MT7531 reset level.
+ */
+
+/ {
+	model = "Vistotek C6130G-5G";
+	compatible = "vistotek,c6130g", "mediatek,mt7981";
+
+	aliases {
+		serial0 = &uart0;	/* fixes ttyS0 console / procd stdio */
+		led-boot = &led_status_blue;
+		led-failsafe = &led_status_red;
+		led-running = &led_status_blue;
+		led-upgrade = &led_status_red;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0 0x40000000 0 0x20000000>;	/* 512 MiB */
+	};
+
+	reg_3p3v: regulator-3p3v {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-3.3V";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	reg_5v: regulator-5v {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-5V";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	/*
+	 * RM520N-GL control lines (from vendor gpio-export). Exported so a hotplug/
+	 * init script can sequence power-on, mirroring stock behaviour.
+	 *   5gpower  pin 25  main power enable
+	 *   5gpwrkey pin 2   PWRKEY pulse
+	 *   5gsim    pin 15  SIM select/enable
+	 */
+	gpio-export {
+		compatible = "gpio-export";
+		#size-cells = <0>;
+
+		modem_power {
+			gpio-export,name = "5gpower";
+			gpio-export,output = <0>;	/* stock inits 0; modem is powered on via 5gpwrkey pulse */
+			gpios = <&pio 25 GPIO_ACTIVE_HIGH>;
+		};
+		modem_pwrkey {
+			gpio-export,name = "5gpwrkey";
+			gpio-export,output = <0>;
+			gpios = <&pio 2 GPIO_ACTIVE_HIGH>;
+		};
+		modem_sim {
+			gpio-export,name = "5gsim";
+			gpio-export,output = <1>;
+			gpios = <&pio 15 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+		};
+		wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&pio 0 GPIO_ACTIVE_LOW>;
+		};
+		rfkill {
+			label = "rfkill";
+			linux,code = <KEY_RFKILL>;
+			gpios = <&pio 7 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_status_blue: led-blue   { label = "blue:status"; gpios = <&pio  5 GPIO_ACTIVE_HIGH>; };
+		led_status_red: led-red    { label = "red:status";  gpios = <&pio  6 GPIO_ACTIVE_HIGH>; };
+		led-wifi   { label = "blue:wifi";   gpios = <&pio  9 GPIO_ACTIVE_HIGH>; };
+		led-5gblue { label = "blue:5g";     gpios = <&pio 11 GPIO_ACTIVE_HIGH>; };
+		led-5gyel  { label = "yellow:5g";   gpios = <&pio 12 GPIO_ACTIVE_HIGH>; };
+		led-4gblue { label = "blue:4g";     gpios = <&pio 13 GPIO_ACTIVE_HIGH>; };
+		led-4gyel  { label = "yellow:4g";   gpios = <&pio 10 GPIO_ACTIVE_HIGH>; };
+		/* port activity LEDs are yellow (verified on hardware); TODO: netdev triggers */
+		led-lan2   { label = "yellow:lan2"; gpios = <&pio  4 GPIO_ACTIVE_LOW>;  };
+		led-lan3   { label = "yellow:lan3"; gpios = <&pio 22 GPIO_ACTIVE_LOW>;  };
+		led-wan    { label = "yellow:wan";  gpios = <&pio  8 GPIO_ACTIVE_LOW>;  };
+	};
+};
+
+/* ---------------- Serial console ---------------- */
+&uart0 {
+	status = "okay";	/* base dtsi ships this disabled; required for ttyS0 console */
+};
+
+/* ---------------- WiFi (mt76) ---------------- */
+&wifi {
+	status = "okay";
+	/* mt76 offsets the second band internally */
+	nvmem-cells = <&eeprom_factory_0>, <&macaddr_wtinfo>;
+	nvmem-cell-names = "eeprom", "mac-address";
+};
+
+/* ---------------- USB3 -> RM520N ---------------- */
+&usb_phy {
+	status = "okay";	/* base dtsi ships the T-PHY disabled; without it xhci defers forever */
+};
+
+&xhci {
+	vusb33-supply = <&reg_3p3v>;
+	vbus-supply = <&reg_5v>;
+	status = "okay";
+};
+
+/* ---------------- Ethernet / DSA ---------------- */
+&eth {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mdio_pins>;
+	status = "okay";
+
+	gmac0: mac@0 {
+		compatible = "mediatek,eth-mac";
+		reg = <0>;
+		phy-mode = "2500base-x";
+		nvmem-cells = <&macaddr_wtinfo>;
+		nvmem-cell-names = "mac-address";
+		fixed-link {
+			speed = <2500>;
+			full-duplex;
+			pause;
+		};
+	};
+};
+
+&mdio_bus {
+	switch@31 {
+		compatible = "mediatek,mt7531";
+		reg = <31>;
+		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;	/* [VERIFY] level */
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&pio>;
+		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 { reg = <1>; label = "lan2"; };
+			port@2 { reg = <2>; label = "lan3"; };
+			port@3 { reg = <3>; label = "wan"; };
+			port@6 {
+				reg = <6>;
+				label = "cpu";
+				ethernet = <&gmac0>;
+				phy-mode = "2500base-x";
+				fixed-link {
+					speed = <2500>;
+					full-duplex;
+					pause;
+				};
+			};
+		};
+	};
+};
+
+/* ---------------- SPI-NAND (rootfs) ----------------
+ * Stock MTK U-Boot boots the FIT from the 'kernel' volume of the UBI on 'ubi'.
+ * 'ubi2' is the A/B backup slot. Root comes from the separate squashfs 'rootfs'
+ * volume via the generic auto-attach ("linux,ubi") + rootfs auto-ubiblock patches
+ * (no root= needed on the stock U-Boot cmdline).
+ */
+&spi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_flash_pins>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <52000000>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "ubi";
+				reg = <0x0 0x3800000>;		/* 56 MiB */
+				compatible = "linux,ubi";
+			};
+			partition@3800000 {
+				label = "ubi2";
+				reg = <0x3800000 0x3800000>;	/* stock A/B backup */
+			};
+		};
+	};
+};
+
+/* ---------------- SPI-NOR (bootloader / factory) ----------------
+ * Left intact so the stock, working bootloader chain stays put.
+ */
+&spi2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi2_flash_pins>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <52000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0     { label = "BL2";        reg = <0x000000 0x040000>; read-only; };
+			partition@40000 { label = "u-boot-env"; reg = <0x040000 0x010000>; };
+
+			partition@50000 {
+				label = "Factory";
+				reg = <0x050000 0x0b0000>;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					/* mt76 eeprom (default cal; MAC bytes here are zero) */
+					eeprom_factory_0: eeprom@0 {
+						reg = <0x0 0x1000>;
+					};
+				};
+			};
+
+			partition@100000 { label = "FIP";    reg = <0x100000 0x200000>; read-only; };
+			partition@300000 { label = "woem";   reg = <0x300000 0x010000>; };
+
+			partition@310000 {
+				/* Wingtech factory blob: "WTINFO0001" | mac[6] @ 0x0a (plaintext)
+				 * | md5 | DES-CBC json. The MAC is readable without decryption. */
+				label = "wtinfo";
+				reg = <0x310000 0x010000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					macaddr_wtinfo: macaddr@a {
+						reg = <0xa 0x6>;
+					};
+				};
+			};
+
+			partition@320000 { label = "nvram";  reg = <0x320000 0x010000>; };
+		};
+	};
+};
+
+/* ---------------- flash pin groups ---------------- */
+&pio {
+	spi0_flash_pins: spi0-pins {
+		mux {
+			function = "spi";
+			groups = "spi0", "spi0_wp_hold";
+		};
+		conf-pu {
+			pins = "SPI0_CS", "SPI0_HOLD", "SPI0_WP";
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_11>;
+		};
+		conf-pd {
+			pins = "SPI0_CLK", "SPI0_MOSI", "SPI0_MISO";
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_11>;
+		};
+	};
+
+	spi2_flash_pins: spi2-pins {
+		mux {
+			function = "spi";
+			groups = "spi2", "spi2_wp_hold";
+		};
+		conf-pu {
+			pins = "SPI2_CS", "SPI2_HOLD", "SPI2_WP";
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_11>;
+		};
+		conf-pd {
+			pins = "SPI2_CLK", "SPI2_MOSI", "SPI2_MISO";
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_11>;
+		};
+	};
+};

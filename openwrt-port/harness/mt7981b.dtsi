@@ -1,0 +1,32 @@
+/* harness SoC stub — provides labels our overlays target (not the real SoC) */
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/pinctrl/mt65xx.h>
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	soc {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		pio: pinctrl@11d00000 {
+			gpio-controller; #gpio-cells = <2>;
+			interrupt-controller; #interrupt-cells = <2>;
+		};
+		serial0: serial@11002000 { };
+		spi0: spi@1100a000 { #address-cells = <1>; #size-cells = <0>; status = "disabled"; };
+		spi1: spi@1100b000 { #address-cells = <1>; #size-cells = <0>; status = "disabled"; };
+		spi2: spi@11009000 { #address-cells = <1>; #size-cells = <0>; status = "disabled"; };
+		xhci: usb@11200000 { status = "disabled"; };
+		wifi: wifi@18000000 { status = "disabled"; };
+		eth: ethernet@15100000 {
+			#address-cells = <1>; #size-cells = <0>; status = "disabled";
+			mdio_bus: mdio-bus { #address-cells = <1>; #size-cells = <0>; };
+		};
+		mdio_pins: mdc-mdio-pins { };
+	};
+
+	aliases { serial0 = &serial0; };
+};
