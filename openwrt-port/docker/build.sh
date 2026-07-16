@@ -33,8 +33,7 @@ if [ -d /build/openwrt/.git ]; then
   python3 /staging/docker/add_network.py target/linux/mediatek/filogic/base-files/etc/board.d/02_network
   if [ -d /staging/files ]; then
     cp -rv /staging/files/. target/linux/mediatek/filogic/base-files/
-    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* \
-             target/linux/mediatek/filogic/base-files/usr/sbin/modem-led 2>/dev/null || true
+    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* 2>/dev/null || true
   fi
   # regenerate .config from the seed every time: a re-run of defconfig alone
   # keeps stale "# CONFIG_PACKAGE_x is not set" pins and silently drops
@@ -55,8 +54,7 @@ else
   python3 /staging/docker/add_network.py target/linux/mediatek/filogic/base-files/etc/board.d/02_network
   if [ -d /staging/files ]; then
     cp -rv /staging/files/. target/linux/mediatek/filogic/base-files/
-    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* \
-             target/linux/mediatek/filogic/base-files/usr/sbin/modem-led 2>/dev/null || true
+    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* 2>/dev/null || true
   fi
   ./scripts/feeds update -a  >/tmp/feeds.log  2>&1
   ./scripts/feeds install -a >/tmp/feeds2.log 2>&1

@@ -39,22 +39,14 @@ dial (no SIM on hand).
 - **WiFi** — both bands via mt76 and the Factory eeprom.
 - **Switch** — MT7531 DSA: lan2, lan3, wan.
 - **Buttons** — reset, wps, rfkill via `gpio-button-hotplug`.
-- **LEDs** — all 10, with default triggers wired in board.d: `netdev` on the port LEDs,
-  `heartbeat` on status, and the modem-status daemon on the 4G/5G LEDs (below).
+- **LEDs** — all 10, with default triggers wired in board.d: `netdev` on the port LEDs and
+  `heartbeat` on status. The four 4G/5G modem LEDs are defined (named, no trigger) so they
+  appear in LuCI for the user to assign.
 - **Modem** — the RM520N-GL enumerates (ttyUSB0-3, cdc_ether `usb0`) once the T-PHY
   (`&usb_phy`) is enabled and `modem-power` pulses `5gpwrkey` at boot; ECM mode as stock.
 - **MAC** — read from the plaintext `wtinfo` header via an nvmem fixed-layout cell (no
   hardcoding, upstreamable). The per-unit MAC lives only in `wtinfo`, not Factory.
 - **LuCI** — served at `http://192.168.1.1`.
-
-### 4G/5G indicator LEDs
-
-`modem-led` (a procd service plus the `/usr/sbin/modem-led` engine) polls the RM520N and
-lights one LED by connection state: `blue:5g` = 5G online, `yellow:5g` = 5G attached-only,
-`blue:4g` / `yellow:4g` = the LTE equivalents, all off = no service. It only drives LEDs
-left on the `none` kernel trigger, so a LuCI override (e.g. `default-on` = always on) or
-`/etc/init.d/modem-led disable` takes over. Design:
-[openwrt-port/docs/2026-07-16-modem-led-design.md](openwrt-port/docs/2026-07-16-modem-led-design.md).
 
 ## Building
 
