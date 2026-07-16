@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+# Power on the Quectel RM520N-GL 5G modem on the Vistotek C6130G-5G.
+# The module powers up on a PWRKEY pulse (exported GPIO "5gpwrkey");
+# the stock-style 5gpower pulse alone does not wake it (verified on hw).
+
+START=25
+
+boot() {
+	[ -e /sys/class/gpio/5gpwrkey/value ] || return 0
+	(
+		# a warm reboot can leave the module running; pulsing PWRKEY
+		# again would power it OFF, so give it time to enumerate first
+		sleep 5
+		grep -qs 2c7c /sys/bus/usb/devices/*/idVendor && exit 0
+		echo 0 > /sys/class/gpio/5gpower/value
+		echo 1 > /sys/class/gpio/5gsim/value
+		echo 1 > /sys/class/gpio/5gpwrkey/value
+		sleep 1
+		echo 0 > /sys/class/gpio/5gpwrkey/value
+	) &
+}
