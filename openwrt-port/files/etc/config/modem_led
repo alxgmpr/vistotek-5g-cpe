@@ -1,4 +1,0 @@
-config modem-led 'globals'
-	option enabled '1'
-	option port '/dev/ttyUSB2'
-	option interval '10'

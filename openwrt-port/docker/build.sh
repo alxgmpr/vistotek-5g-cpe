@@ -32,9 +32,20 @@ if [ -d /build/openwrt/.git ]; then
   python3 /staging/docker/add_leds.py target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
   python3 /staging/docker/add_network.py target/linux/mediatek/filogic/base-files/etc/board.d/02_network
   if [ -d /staging/files ]; then
-    cp -rv /staging/files/. target/linux/mediatek/filogic/base-files/
-    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* \
-             target/linux/mediatek/filogic/base-files/usr/sbin/modem-led 2>/dev/null || true
+    BF=target/linux/mediatek/filogic/base-files
+    # Keep the overlay delete-aware: on an incremental build the tree persists,
+    # so a file removed from files/ would otherwise linger in base-files. Track
+    # what we install in a manifest and drop anything that has since vanished
+    # (only touches paths we own, never other base-files).
+    MANI=/staging/.overlay-manifest
+    if [ -f "$MANI" ]; then
+      while IFS= read -r rel; do
+        [ -n "$rel" ] && [ ! -e "/staging/files/$rel" ] && rm -fv "$BF/$rel"
+      done < "$MANI"
+    fi
+    cp -rv /staging/files/. "$BF/"
+    chmod +x "$BF"/etc/init.d/* 2>/dev/null || true
+    ( cd /staging/files && find . -type f | sed 's#^\./##' ) > "$MANI"
   fi
   # regenerate .config from the seed every time: a re-run of defconfig alone
   # keeps stale "# CONFIG_PACKAGE_x is not set" pins and silently drops
@@ -55,8 +66,7 @@ else
   python3 /staging/docker/add_network.py target/linux/mediatek/filogic/base-files/etc/board.d/02_network
   if [ -d /staging/files ]; then
     cp -rv /staging/files/. target/linux/mediatek/filogic/base-files/
-    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* \
-             target/linux/mediatek/filogic/base-files/usr/sbin/modem-led 2>/dev/null || true
+    chmod +x target/linux/mediatek/filogic/base-files/etc/init.d/* 2>/dev/null || true
   fi
   ./scripts/feeds update -a  >/tmp/feeds.log  2>&1
   ./scripts/feeds install -a >/tmp/feeds2.log 2>&1

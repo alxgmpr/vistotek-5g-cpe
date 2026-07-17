@@ -15,9 +15,8 @@ block = (
     "\tucidef_set_led_netdev \"wan\" \"WAN\" \"yellow:wan\" \"wan\" \"link tx rx\"\n"
     "\tucidef_set_led_netdev \"wlan2g\" \"WLAN2G\" \"blue:wifi\" \"phy0-ap0\" \"link tx rx\"\n"
     "\tucidef_set_led_heartbeat \"status\" \"STATUS\" \"blue:status\"\n"
-    # Modem indicator LEDs: named + default-off on the "none" trigger so they show
-    # in LuCI and are driven by the modem-led daemon (which only touches LEDs left
-    # on "none"). Set any other trigger in LuCI to override (e.g. default-on).
+    # Modem indicator LEDs: named + default-off with no trigger so they appear in
+    # LuCI for the user to assign (e.g. netdev on the modem interface, or default-on).
     "\tucidef_set_led_default \"5g_blue\" \"5G-BLUE\" \"blue:5g\" \"0\"\n"
     "\tucidef_set_led_default \"5g_yellow\" \"5G-YELLOW\" \"yellow:5g\" \"0\"\n"
     "\tucidef_set_led_default \"4g_blue\" \"4G-BLUE\" \"blue:4g\" \"0\"\n"

@@ -28,3 +28,6 @@ openwrt-port/tftp/*.itb
 
 # macOS
 .DS_Store
+
+# incremental-build overlay tracking (build state)
+openwrt-port/.overlay-manifest

@@ -23,7 +23,8 @@
  * plaintext header at offset 0x0a, so a plain nvmem fixed-layout cell reads it.
  *
  * Modem power-on (verified on hw): module starts on a 5gpwrkey pulse (1 -> 1s -> 0),
- * handled by /etc/init.d/modem-power. [VERIFY] remaining: MT7531 reset level.
+ * handled by /etc/init.d/modem-power. Switch reset/IRQ cross-checked against the
+ * stock WT7981P DTB (see the switch node).
  */
 
 / {
@@ -178,11 +179,12 @@
 	switch@31 {
 		compatible = "mediatek,mt7531";
 		reg = <31>;
-		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;	/* [VERIFY] level */
-		interrupt-controller;
-		#interrupt-cells = <1>;
-		interrupt-parent = <&pio>;
-		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+		/* reset pin 39, active-high: confirmed against the stock WT7981P DTB */
+		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+		/*
+		 * No switch IRQ: the stock DTB wires none, so the internal PHYs are
+		 * polled (mainline mt7531 falls back to polling without "interrupts").
+		 */
 
 		ports {
 			#address-cells = <1>;

@@ -38,16 +38,7 @@ console, and the RM520N modem. Only a live data dial is unexercised (no SIM).
 - **MAC** — read from the plaintext `wtinfo` header via an nvmem fixed-layout cell; the
   per-unit MAC lives only in `wtinfo`, not Factory.
 - **LEDs** — board.d wires `netdev` on the port LEDs and `heartbeat` on status; the four
-  4G/5G LEDs are driven by the `modem-led` daemon (below).
-
-### 4G/5G indicator LEDs
-
-`modem-led` (a procd service plus the `/usr/sbin/modem-led` engine) polls the RM520N and
-lights one LED by connection state: `blue:5g` = 5G online, `yellow:5g` = 5G attached-only,
-`blue:4g` / `yellow:4g` = the LTE equivalents, all off = no service. It only drives LEDs left
-on the `none` trigger, so a LuCI override (`default-on` = always on) or
-`/etc/init.d/modem-led disable` takes over. Design:
-[openwrt-port/docs/2026-07-16-modem-led-design.md](openwrt-port/docs/2026-07-16-modem-led-design.md).
+  4G/5G LEDs are defined (named, no trigger) for the user to assign in LuCI.
 
 ## Building
 
@@ -77,13 +68,6 @@ reflash the NOR from `dump.bin` with a SOIC8 clip — the stock BL2/U-Boot on NO
 touched, and the dual UBI is a fallback slot. Backups (`dump.bin`, `ubi.bin`, `ubi2.bin`,
 extracted `rootfs/`) and `wtinfo_decrypt.py` (the wtinfo/MAC decryptor, key `wtinfo-des-v1`)
 are kept locally — gitignored, too large for the repo.
-
-## Branches
-
-- **`main`** — the full working image, including the `modem-led` connection-state daemon above.
-- **`upstream`** — the mainline-submission form: the daemon is dropped (4G/5G LEDs defined-only)
-  and the guessed MT7531 switch IRQ removed after cross-checking the stock DTB (reset polarity
-  confirmed, vendor declares no switch interrupt).
 
 ## Known issues
 
